@@ -505,10 +505,37 @@ router.delete('/rapports/:id_rapport', IsAuthenticated, rapportController.delete
  * @swagger
  * /api/rapports/dashboard/full:
  *   get:
- *     summary: Get admin dashboard statistics
+ *     summary: Get admin dashboard statistics with optional filters
  *     tags: [Rapports]
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: start_date
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Start date for filtering reports (YYYY-MM-DD)
+ *         example: "2025-01-01"
+ *       - in: query
+ *         name: end_date
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: End date for filtering reports (YYYY-MM-DD)
+ *         example: "2025-12-31"
+ *       - in: query
+ *         name: ppn_id
+ *         schema:
+ *           type: integer
+ *         description: Filter by specific product (PPN ID)
+ *         example: 1
+ *       - in: query
+ *         name: district
+ *         schema:
+ *           type: string
+ *         description: Filter by district (partial match)
+ *         example: "Ambatondrazaka"
  *     responses:
  *       200:
  *         description: Dashboard statistics
@@ -552,6 +579,12 @@ router.delete('/rapports/:id_rapport', IsAuthenticated, rapportController.delete
  *                       avg_prix_gros:
  *                         type: string
  *                         example: "2000.00"
+ *                       max_prix_unitaire:
+ *                         type: string
+ *                         example: "3000.00"
+ *                       min_prix_unitaire:
+ *                         type: string
+ *                         example: "1500.00"
  *                       count:
  *                         type: integer
  *                         example: 10
@@ -601,6 +634,23 @@ router.delete('/rapports/:id_rapport', IsAuthenticated, rapportController.delete
  *                       count:
  *                         type: integer
  *                         example: 20
+ *                       change_frequency:
+ *                         type: integer
+ *                         example: 5
+ *                       price_evolution:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             date:
+ *                               type: string
+ *                               example: "2025-05-01"
+ *                             avg_prix_unitaire:
+ *                               type: string
+ *                               example: "2250.00"
+ *                             avg_prix_gros:
+ *                               type: string
+ *                               example: "2000.0006"
  *                 by_employe:
  *                   type: array
  *                   items:
@@ -632,9 +682,38 @@ router.delete('/rapports/:id_rapport', IsAuthenticated, rapportController.delete
  *                       avg_prix_gros:
  *                         type: string
  *                         example: "2000.00"
+ *                       max_prix_unitaire:
+ *                         type: string
+ *                         example: "3000.00"
+ *                       min_prix_unitaire:
+ *                         type: string
+ *                         example: "1500.00"
  *                       count:
  *                         type: integer
  *                         example: 12
+ *                 by_region:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       region:
+ *                         type: string
+ *                         example: "ANALAMANGA"
+ *                       avg_prix_unitaire:
+ *                         type: string
+ *                         example: "2250.00"
+ *                       avg_prix_gros:
+ *                         type: string
+ *                         example: "2000.00"
+ *                       max_prix_unitaire:
+ *                         type: string
+ *                         example: "3000.00"
+ *                       min_prix_unitaire:
+ *                         type: string
+ *                         example: "1500.00"
+ *                       count:
+ *                         type: integer
+ *                         example: 30
  *                 inflation:
  *                   type: array
  *                   items:
@@ -661,6 +740,7 @@ router.delete('/rapports/:id_rapport', IsAuthenticated, rapportController.delete
  *                   type: string
  *                   example: "2025-05"
  *                 price_evolution:
+ *                   Jon: true
  *                   type: array
  *                   items:
  *                     type: object
@@ -674,6 +754,12 @@ router.delete('/rapports/:id_rapport', IsAuthenticated, rapportController.delete
  *                       avg_prix_gros:
  *                         type: string
  *                         example: "2000.00"
+ *       400:
+ *         description: Invalid query parameters (e.g., invalid dates)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  *       403:
  *         description: Forbidden (admin only)
  *         content:

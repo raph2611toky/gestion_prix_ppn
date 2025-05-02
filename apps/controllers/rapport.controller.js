@@ -342,41 +342,75 @@ const deleteRapport = async (req, res) => {
 };
 
 // 8 - Admin Dashboard
-const  getDashboard = async (req, res) => {
+const getDashboard = async (req, res) => {
     try {
         if (req.employe.fonction !== 'ADMINISTRATEUR') {
             return Helper.send_res(res, { erreur: 'Accès réservé aux administrateurs.' }, 403);
         }
 
+        // Extract query parameters for filtering
+        const { start_date, end_date, ppn_id, district } = req.query;
+
+        // Build where clause for filtering
+        const whereClause = {};
+        if (start_date && end_date) {
+            const start = moment(start_date).startOf('day').toDate();
+            const end = moment(end_date).endOf('day').toDate();
+            if (!moment(start_date).isValid() || !moment(end_date).isValid()) {
+                return Helper.send_res(res, { erreur: 'Dates invalides.' }, 400);
+            }
+            whereClause.date = { [Op.between]: [start, end] };
+        }
+        if (ppn_id) {
+            whereClause.ppn_id = ppn_id;
+        }
+        if (district) {
+            whereClause.district = { [Op.like]: `%${district}%` };
+        }
+
         const rapports = await Rapport.findAll({
+            where: whereClause,
             include: [
                 { model: Ppn, as: 'ppn' },
                 { model: Employe, as: 'employe' }
             ]
         });
 
-        // Parse prices
+        if (!rapports.length) {
+            return Helper.send_res(res, { message: 'Aucun rapport trouvé pour les filtres spécifiés.' }, 200);
+        }
+
+        // Parse prices and prepare data
         const parsedRapports = rapports.map(r => ({
             ...r.dataValues,
             avg_prix_unitaire: (parseFloat(r.prix_unitaire_min) + parseFloat(r.prix_unitaire_max)) / 2,
             avg_prix_gros: (parseFloat(r.prix_gros_min) + parseFloat(r.prix_gros_max)) / 2,
             month: moment(r.date).format('YYYY-MM'),
             year: moment(r.date).format('YYYY'),
-            day: moment(r.date).format('YYYY-MM-DD')
+            day: moment(r.date).format('YYYY-MM-DD'),
+            region: r.employe?.region
         }));
 
-        // Group by month, year, PPN, employee, district
+        // Group data by various dimensions
         const byMonth = {};
         const byYear = {};
         const byPpn = {};
         const byEmploye = {};
         const byDistrict = {};
+        const byRegion = {};
+        const priceChanges = {};
+
         parsedRapports.forEach(r => {
+            const ppnKey = r.ppn?.nom_ppn || 'Unknown';
+            const empKey = r.employe?.nom || 'Unknown';
+            const regionKey = r.region || 'Unknown';
+
             // By Month
-            if (!byMonth[r.month]) byMonth[r.month] = { total_prix_unitaire: 0, total_prix_gros: 0, count: 0 };
+            if (!byMonth[r.month]) byMonth[r.month] = { total_prix_unitaire: 0, total_prix_gros: 0, count: 0, prices_unitaire: [] };
             byMonth[r.month].total_prix_unitaire += r.avg_prix_unitaire;
             byMonth[r.month].total_prix_gros += r.avg_prix_gros;
             byMonth[r.month].count += 1;
+            byMonth[r.month].prices_unitaire.push(r.avg_prix_unitaire);
 
             // By Year
             if (!byYear[r.year]) byYear[r.year] = { total_prix_unitaire: 0, total_prix_gros: 0, count: 0 };
@@ -385,26 +419,44 @@ const  getDashboard = async (req, res) => {
             byYear[r.year].count += 1;
 
             // By PPN
-            const ppnKey = r.ppn.nom_ppn;
-            if (!byPpn[ppnKey]) byPpn[ppnKey] = { total_prix_unitaire: 0, total_prix_gros: 0, count: 0, prices_unitaire: [], prices_gros: [] };
+            if (!byPpn[ppnKey]) byPpn[ppnKey] = { 
+                total_prix_unitaire: 0, 
+                total_prix_gros: 0, 
+                count: 0, 
+                prices_unitaire: [], 
+                prices_gros: [],
+                dates: []
+            };
             byPpn[ppnKey].total_prix_unitaire += r.avg_prix_unitaire;
             byPpn[ppnKey].total_prix_gros += r.avg_prix_gros;
             byPpn[ppnKey].count += 1;
             byPpn[ppnKey].prices_unitaire.push(r.avg_prix_unitaire);
             byPpn[ppnKey].prices_gros.push(r.avg_prix_gros);
+            byPpn[ppnKey].dates.push(r.day);
 
             // By Employe
-            const empKey = r.employe.nom;
             if (!byEmploye[empKey]) byEmploye[empKey] = { total_prix_unitaire: 0, total_prix_gros: 0, count: 0 };
             byEmploye[empKey].total_prix_unitaire += r.avg_prix_unitaire;
             byEmploye[empKey].total_prix_gros += r.avg_prix_gros;
             byEmploye[empKey].count += 1;
 
             // By District
-            if (!byDistrict[r.district]) byDistrict[r.district] = { total_prix_unitaire: 0, total_prix_gros: 0, count: 0 };
+            if (!byDistrict[r.district]) byDistrict[r.district] = { total_prix_unitaire: 0, total_prix_gros: 0, count: 0, prices_unitaire: [] };
             byDistrict[r.district].total_prix_unitaire += r.avg_prix_unitaire;
             byDistrict[r.district].total_prix_gros += r.avg_prix_gros;
             byDistrict[r.district].count += 1;
+            byDistrict[r.district].prices_unitaire.push(r.avg_prix_unitaire);
+
+            // By Region
+            if (!byRegion[regionKey]) byRegion[regionKey] = { total_prix_unitaire: 0, total_prix_gros: 0, count: 0, prices_unitaire: [] };
+            byRegion[regionKey].total_prix_unitaire += r.avg_prix_unitaire;
+            byRegion[regionKey].total_prix_gros += r.avg_prix_gros;
+            byRegion[regionKey].count += 1;
+            byRegion[regionKey].prices_unitaire.push(r.avg_prix_unitaire);
+
+            // Track price changes for frequency
+            if (!priceChanges[ppnKey]) priceChanges[ppnKey] = [];
+            priceChanges[ppnKey].push({ date: r.day, price: r.avg_prix_unitaire });
         });
 
         // Calculate Statistics
@@ -424,7 +476,9 @@ const  getDashboard = async (req, res) => {
                 month,
                 avg_prix_unitaire: (byMonth[month].total_prix_unitaire / byMonth[month].count).toFixed(2),
                 avg_prix_gros: (byMonth[month].total_prix_gros / byMonth[month].count).toFixed(2),
-                count: byMonth[month].count
+                count: byMonth[month].count,
+                max_prix_unitaire: Math.max(...byMonth[month].prices_unitaire, 0).toFixed(2),
+                min_prix_unitaire: Math.min(...byMonth[month].prices_unitaire.filter(p => p > 0), Infinity).toFixed(2) || "0.00"
             })).sort((a, b) => a.month.localeCompare(b.month)),
             by_year: Object.keys(byYear).map(year => ({
                 year,
@@ -432,32 +486,60 @@ const  getDashboard = async (req, res) => {
                 avg_prix_gros: (byYear[year].total_prix_gros / byYear[year].count).toFixed(2),
                 count: byYear[year].count
             })).sort((a, b) => a.year.localeCompare(b.year)),
-            by_ppn: Object.keys(byPpn).map(nom_ppn => ({
-                nom_ppn,
-                avg_prix_unitaire: (byPpn[nom_ppn].total_prix_unitaire / byPpn[nom_ppn].count).toFixed(2),
-                avg_prix_gros: (byPpn[nom_ppn].total_prix_gros / byPpn[nom_ppn].count).toFixed(2),
-                max_prix_unitaire: Math.max(...byPpn[nom_ppn].prices_unitaire, 0).toFixed(2),
-                min_prix_unitaire: Math.min(...byPpn[nom_ppn].prices_unitaire.filter(p => p > 0), Infinity).toFixed(2) || "0.00",
-                max_prix_gros: Math.max(...byPpn[nom_ppn].prices_gros, 0).toFixed(2),
-                min_prix_gros: Math.min(...byPpn[nom_ppn].prices_gros.filter(p => p > 0), Infinity).toFixed(2) || "0.00",
-                count: byPpn[nom_ppn].count
-            })),
+            by_ppn: Object.keys(byPpn).map(nom_ppn => {
+                const prices = byPpn[nom_ppn].prices_unitaire;
+                const sortedChanges = priceChanges[nom_ppn]?.sort((a, b) => a.date.localeCompare(b.date)) || [];
+                let changeFrequency = 0;
+                if (sortedChanges.length > 1) {
+                    for (let i = 1; i < sortedChanges.length; i++) {
+                        if (sortedChanges[i].price !== sortedChanges[i - 1].price) {
+                            changeFrequency++;
+                        }
+                    }
+                }
+                return {
+                    nom_ppn: nom_ppn,
+                    avg_prix_unitaire: (byPpn[nom_ppn].total_prix_unitaire / byPpn[nom_ppn].count).toFixed(2),
+                    avg_prix_gros: (byPpn[nom_ppn].total_prix_gros / byPpn[nom_ppn].count).toFixed(2),
+                    max_prix_unitaire: Math.max(...prices, 0).toFixed(2),
+                    min_prix_unitaire: Math.min(...prices.filter(p => p > 0), Infinity).toFixed(2) || "0.00",
+                    max_prix_gros: Math.max(...byPpn[nom_ppn].prices_gros, 0).toFixed(2),
+                    min_prix_gros: Math.min(...byPpn[nom_ppn].prices_gros.filter(p => p > 0), Infinity).toFixed(2) || "0.00",
+                    count: byPpn[nom_ppn].count,
+                    price_evolution: byPpn[nom_ppn].dates.map((date, i) => ({
+                        date,
+                        avg_prix_unitaire: byPpn[nom_ppn].prices_unitaire[i].toFixed(2),
+                        avg_prix_gros: byPpn[nom_ppn].prices_gros[i].toFixed(2)
+                    })).sort((a, b) => a.date.localeCompare(b.date)),
+                    change_frequency: changeFrequency
+                };
+            }),
             by_employe: Object.keys(byEmploye).map(nom => ({
                 nom,
                 avg_prix_unitaire: (byEmploye[nom].total_prix_unitaire / byEmploye[nom].count).toFixed(2),
                 avg_prix_gros: (byEmploye[nom].total_prix_gros / byEmploye[nom].count).toFixed(2),
                 count: byEmploye[nom].count
             })),
-            by_district: Object.keys(byDistrict).map(district => ({
+            by_district: Object.keys(byDistrict | {}).map(district => ({
                 district,
                 avg_prix_unitaire: (byDistrict[district].total_prix_unitaire / byDistrict[district].count).toFixed(2),
                 avg_prix_gros: (byDistrict[district].total_prix_gros / byDistrict[district].count).toFixed(2),
-                count: byDistrict[district].count
+                count: byDistrict[district].count,
+                max_prix_unitaire: Math.max(...byDistrict[district].prices_unitaire, 0).toFixed(2),
+                min_prix_unitaire: Math.min(...byDistrict[district].prices_unitaire.filter(p => p > 0), Infinity).toFixed(2) || "0.00"
+            })),
+            by_region: Object.keys(byRegion).map(region => ({
+                region,
+                avg_prix_unitaire: (byRegion[region].total_prix_unitaire / byRegion[region].count).toFixed(2),
+                avg_prix_gros: (byRegion[region].total_prix_gros / byRegion[region].count).toFixed(2),
+                count: byRegion[region].count,
+                max_prix_unitaire: Math.max(...byRegion[region].prices_unitaire, 0).toFixed(2),
+                min_prix_unitaire: Math.min(...byRegion[region].prices_unitaire.filter(p => p > 0), Infinity).toFixed(2) || "0.00"
             }))
         };
 
         // Inflation and IPC for prix_unitaire
-        const monthlyPrices = stats.by_month.sort((a, b) => a.month.localeCompare(b.month));
+        const monthlyPrices = stats.by_month;
         stats.inflation = [];
         for (let i = 1; i < monthlyPrices.length; i++) {
             const prev = parseFloat(monthlyPrices[i - 1].avg_prix_unitaire);
@@ -477,10 +559,10 @@ const  getDashboard = async (req, res) => {
         }));
 
         // Most Expensive Month (highest avg_prix_unitaire)
-        const maxMonth = stats.by_month.reduce((max, m) => parseFloat(m.avg_prix_unitaire) > parseFloat(max.avg_prix_unitaire) ? m : max, stats.by_month[0] || {});
+        const maxMonth = monthlyPrices.reduce((max, m) => parseFloat(m.avg_prix_unitaire) > parseFloat(max.avg_prix_unitaire) ? m : max, monthlyPrices[0] || {});
         stats.most_expensive_month = maxMonth.month || null;
 
-        // Price Evolution
+        // Overall Price Evolution
         stats.price_evolution = monthlyPrices.map(m => ({
             month: m.month,
             avg_prix_unitaire: m.avg_prix_unitaire,

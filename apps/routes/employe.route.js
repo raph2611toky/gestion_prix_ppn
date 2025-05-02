@@ -31,7 +31,7 @@ const { IsAuthenticated, IsAuthenticatedAdmin } = require("../../middlewares/aut
  *                 example: "password123"
  *               region:
  *                 type: string
- *                 enum: [Diana, Sava, Itasy, Analamanga, Vakinankaratra, Bongolava, Sofia, Boeny, Betsiboka, Melaky, Alaotra-Mangoro, Atsinanana, Analanjirofo, "Amoron'i Mania", Haute Matsiatra, Vatovavy-Fitovinany, Atsimo-Atsinanana, Ihorombe, Menabe, Atsimo-Andrefana, Androy, Anosy]
+ *                 enum: [DIANA, SAVA, ITASY, ANALAMANGA, VAKINANKARATRA, BONGOLAVA, SOFIA, BOENY, BETSIBOKA, MELAKY, ALAOTRA_MANGORO, ATSINANANA, ANALANJIROFO, AMORON_I_MANIA, HAUTE_MATSIATRA, VATOVAVY_FITOVINANY, ATSIMO_ATSINANANA, IHOROMBE, MENABE, ATSIMO_ANDREFANA, ANDROY, ANOSY]
  *                 example: "Analamanga"
  *               fonction:
  *                 type: string
@@ -190,7 +190,7 @@ router.get('/employes/profile', IsAuthenticated, employeController.getProfileEmp
  *                 example: "newpassword123"
  *               region:
  *                 type: string
- *                 enum: [Diana, Sava, Itasy, Analamanga, Vakinankaratra, Bongolava, Sofia, Boeny, Betsiboka, Melaky, Alaotra-Mangoro, Atsinanana, Analanjirofo, "Amoron'i Mania", Haute Matsiatra, Vatovavy-Fitovinany, Atsimo-Atsinanana, Ihorombe, Menabe, Atsimo-Andrefana, Androy, Anosy]
+ *                 enum: [DIANA, SAVA, ITASY, ANALAMANGA, VAKINANKARATRA, BONGOLAVA, SOFIA, BOENY, BETSIBOKA, MELAKY, ALAOTRA_MANGORO, ATSINANANA, ANALANJIROFO, AMORON_I_MANIA, HAUTE_MATSIATRA, VATOVAVY_FITOVINANY, ATSIMO_ATSINANANA, IHOROMBE, MENABE, ATSIMO_ANDREFANA, ANDROY, ANOSY]
  *                 example: "Analamanga"
  *               fonction:
  *                 type: string

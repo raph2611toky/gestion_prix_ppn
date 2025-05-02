@@ -4,7 +4,7 @@ module.exports = {
     HOST: 'localhost',
     USER: 'raph',
     PASSWORD: 'hpar',
-    DB: 'gestiondestocque', 
+    DB: 'gestion_de_ppn', 
     dialect: 'mariadb', 
 
     pool: {
