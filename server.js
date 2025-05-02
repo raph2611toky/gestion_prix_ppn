@@ -29,7 +29,7 @@ app.get('/', (req, res) => {
 });
 
 // Database Sync
-const db = require('./apps/models'); // Load models and sequelize instance
+const db = require('./apps/models/index.js');
 
 // Port
 const PORT = process.env.PORT || 8001;

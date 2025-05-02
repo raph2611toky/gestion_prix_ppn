@@ -1,5 +1,5 @@
 const bcrypt = require('bcrypt');
-const { faker } = require('faker');
+const { faker } = require('@faker-js/faker');
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
@@ -31,7 +31,7 @@ module.exports = {
     regions.forEach((region, index) => {
       employes.push({
         cin: `9876543210${(index + 1).toString().padStart(2, '0')}`,
-        nom: faker.name.findName(),
+        nom: faker.person.fullName(),
         email: `moderator${index + 1}@example.com`,
         password: hashedPassword,
         region: region,

@@ -1,15 +1,19 @@
-const { faker } = require('faker');
+const { faker } = require('@faker-js/faker');
 const moment = require('moment');
 
+function getRandomInt(min, max) {
+  min = Math.ceil(min);
+  max = Math.floor(max);
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 module.exports = {
-  up: async (queryInterface, Sequelize) => {
-    // Fetch all Moderators
+  async up(queryInterface, Sequelize) {
     const moderators = await queryInterface.sequelize.query(
       `SELECT id_employe, region FROM Employes WHERE fonction = 'MODERATEUR'`,
       { type: queryInterface.sequelize.QueryTypes.SELECT }
     );
 
-    // Fetch all PPNs
     const ppns = await queryInterface.sequelize.query(
       `SELECT id_ppn FROM Ppns`,
       { type: queryInterface.sequelize.QueryTypes.SELECT }
@@ -57,20 +61,19 @@ module.exports = {
       for (let i = 0; i < 4; i++) {
         const ppn = ppns[Math.floor(Math.random() * ppns.length)];
         const district = regionDistricts[Math.floor(Math.random() * regionDistricts.length)];
-        const basePrice = faker.random.number({ min: 1000, max: 5000 });
+        const basePrice = getRandomInt(1000, 5000);
 
         rapports.push({
           ppn_id: ppn.id_ppn,
           employe_id: moderator.id_employe,
           prix_unitaire_min: basePrice,
-          prix_unitaire_max: basePrice + faker.random.number({ min: 100, max: 500 }),
+          prix_unitaire_max: basePrice + getRandomInt(100, 500),
           prix_gros_min: basePrice * 0.9,
-          prix_gros_max: (basePrice + faker.random.number({ min: 100, max: 500 })) * 0.9,
+          prix_gros_max: (basePrice + getRandomInt(100, 500)) * 0.9,
           district: district,
           observation: faker.lorem.sentence(),
           date: reportDates[i],
-          created_at: new Date(),
-          updatedAt: new Date()
+          created_at: new Date()
         });
       }
     }
@@ -81,7 +84,7 @@ module.exports = {
     );
 
     const existingKeys = existingRapports.map(r => `${r.employe_id}-${r.ppn_id}-${moment(r.date).format('YYYY-MM-DD')}`);
-    const newRapports = rapports.filter(r => 
+    const newRapports = rapports.filter(r =>
       !existingKeys.includes(`${r.employe_id}-${r.ppn_id}-${moment(r.date).format('YYYY-MM-DD')}`)
     );
 
@@ -90,7 +93,7 @@ module.exports = {
     }
   },
 
-  down: async (queryInterface, Sequelize) => {
+  async down(queryInterface, Sequelize) {
     await queryInterface.bulkDelete('Rapports', null, {});
   }
 };

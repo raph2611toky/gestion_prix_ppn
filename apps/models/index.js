@@ -1,23 +1,19 @@
-// apps.models.index.js
-
-const db_config = require("../../config/db_config.js");
+const dbConfig = require("../../config/db_config.js").development;
 const { Sequelize, DataTypes } = require("sequelize");
-const path = require("path");
 
-// :::: Configurer le base donnée à sequelize :::: //
 const sequelize = new Sequelize(
-  db_config.DB,
-  db_config.USER,
-  db_config.PASSWORD,
+  dbConfig.database,
+  dbConfig.username,
+  dbConfig.password,
   {
-    host: db_config.HOST,
-    dialect: db_config.dialect,
-    logging: false,
+    host: dbConfig.host,
+    dialect: dbConfig.dialect,
+    logging: dbConfig.logging,
     pool: {
-      max: db_config.pool.max,
-      min: db_config.pool.min,
-      acquire: db_config.pool.acquire,
-      idle: db_config.pool.idle,
+      max: dbConfig.pool.max,
+      min: dbConfig.pool.min,
+      acquire: dbConfig.pool.acquire,
+      idle: dbConfig.pool.idle,
     },
   }
 );
@@ -37,18 +33,17 @@ db.Sequelize = sequelize;
 db.sequelize = sequelize;
 
 db.Employe = require("./employe.js")(sequelize, DataTypes);
-db.Ppn = require("./ppn")(sequelize,DataTypes);
-db.Rapport = require("./rapport")(sequelize,DataTypes);
+db.Ppn = require("./ppn")(sequelize, DataTypes);
+db.Rapport = require("./rapport")(sequelize, DataTypes);
 
 Object.values(db).forEach(model => {
   if (model.associate) {
-      model.associate(db);
+    model.associate(db);
   }
 });
 
 db.sequelize.sync({ force: false }).then(() => {
-    console.log("yes re-sync done!");
-  });
-  
+  console.log("yes re-sync done!");
+});
+
 module.exports = db;
-  
